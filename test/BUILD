@@ -92,3 +92,21 @@ py_test(
     python_version = "PY3",
     tags = ["new"],
 )
+
+py_test(
+    name = "extras_test_py2",
+    srcs = ["extras_test.py"],
+    main = "extras_test.py",
+    deps = ["@pip//isort"],
+    python_version = "PY2",
+    tags = ["new"],
+)
+
+py_test(
+    name = "extras_test_py3",
+    srcs = ["extras_test.py"],
+    main = "extras_test.py",
+    deps = ["@pip//isort"],
+    python_version = "PY3",
+    tags = ["new"],
+)
