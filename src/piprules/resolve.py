@@ -163,7 +163,7 @@ class Resolver(object):
 
         dependencies = [
             pipcompat.canonicalize_name(dep.name)
-            for dep in dist.requires()
+            for dep in dist.requires(requirement.extras)
         ]
         version = dist.version
 

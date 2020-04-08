@@ -36,7 +36,8 @@
         "isort": {
           "dependencies": [
             "backports-functools-lru-cache",
-            "futures"
+            "futures",
+            "toml"
           ],
           "is_direct": true,
           "source": "isort_4_3_20_py2_py3_none_any",
@@ -144,6 +145,12 @@
           "source": "six_1_12_0_py2_py3_none_any",
           "version": "1.12.0"
         },
+        "toml": {
+          "dependencies": [],
+          "is_direct": false,
+          "source": "toml_0_10_0_py2_py3_none_any",
+          "version": "0.10.0"
+        },
         "wcwidth": {
           "dependencies": [],
           "is_direct": false,
@@ -169,7 +176,9 @@
           "version": "19.1.0"
         },
         "isort": {
-          "dependencies": [],
+          "dependencies": [
+            "toml"
+          ],
           "is_direct": true,
           "source": "isort_4_3_20_py2_py3_none_any",
           "version": "4.3.20"
@@ -247,6 +256,12 @@
           "source": "six_1_12_0_py2_py3_none_any",
           "version": "1.12.0"
         },
+        "toml": {
+          "dependencies": [],
+          "is_direct": false,
+          "source": "toml_0_10_0_py2_py3_none_any",
+          "version": "0.10.0"
+        },
         "wcwidth": {
           "dependencies": [],
           "is_direct": false,
@@ -292,7 +307,8 @@
         "isort": {
           "dependencies": [
             "backports-functools-lru-cache",
-            "futures"
+            "futures",
+            "toml"
           ],
           "is_direct": true,
           "source": "isort_4_3_20_py2_py3_none_any",
@@ -400,6 +416,12 @@
           "source": "six_1_12_0_py2_py3_none_any",
           "version": "1.12.0"
         },
+        "toml": {
+          "dependencies": [],
+          "is_direct": false,
+          "source": "toml_0_10_0_py2_py3_none_any",
+          "version": "0.10.0"
+        },
         "wcwidth": {
           "dependencies": [],
           "is_direct": false,
@@ -425,7 +447,9 @@
           "version": "19.1.0"
         },
         "isort": {
-          "dependencies": [],
+          "dependencies": [
+            "toml"
+          ],
           "is_direct": true,
           "source": "isort_4_3_20_py2_py3_none_any",
           "version": "4.3.20"
@@ -502,6 +526,12 @@
           "is_direct": false,
           "source": "six_1_12_0_py2_py3_none_any",
           "version": "1.12.0"
+        },
+        "toml": {
+          "dependencies": [],
+          "is_direct": false,
+          "source": "toml_0_10_0_py2_py3_none_any",
+          "version": "0.10.0"
         },
         "wcwidth": {
           "dependencies": [],
@@ -616,6 +646,10 @@
     "six_1_12_0_py2_py3_none_any": {
       "sha256": "3350809f0555b11f552448330d0b52d5f24c91a322ea4a15ef22629740f3761c",
       "url": "https://files.pythonhosted.org/packages/73/fb/00a976f728d0d1fecfe898238ce23f502a721c0ac0ecfedb80e0d88c64e9/six-1.12.0-py2.py3-none-any.whl"
+    },
+    "toml_0_10_0_py2_py3_none_any": {
+      "sha256": "235682dd292d5899d361a811df37e04a8828a5b1da3115886b73cf81ebc9100e",
+      "url": "https://files.pythonhosted.org/packages/a2/12/ced7105d2de62fa7c8fb5fce92cc4ce66b57c95fb875e9318dba7f8c5db0/toml-0.10.0-py2.py3-none-any.whl"
     },
     "wcwidth_0_1_7_py2_py3_none_any": {
       "sha256": "f4ebe71925af7b40a864553f761ed559b43544f8f71746c2d756c7fe788ade7c",
