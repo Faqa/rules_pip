@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import logging
 import os
 import shutil
@@ -38,7 +39,7 @@ class ResolverFactory(object):
                 finder = self._make_finder()
                 preparer = self._make_preparer(requirement_tracker, work_dirs)
                 pip_resolver = self._make_pip_resolver(finder, preparer)
-                wheel_builder = self._make_wheel_builder(finder, preparer)
+                wheel_builder = self._make_wheel_builder(preparer)
 
                 yield Resolver(
                     self.pip_session,
@@ -50,11 +51,13 @@ class ResolverFactory(object):
 
     def _make_finder(self):
         return pipcompat.PackageFinder.create(
-            search_scope=pipcompat.SearchScope.create(
-                find_links=[],
-                index_urls=self.index_urls,
+            link_collector=pipcompat.LinkCollector(
+                session=self.pip_session,
+                search_scope=pipcompat.SearchScope.create(
+                    find_links=[],
+                    index_urls=self.index_urls,
+                ),
             ),
-            session=self.pip_session,
             selection_prefs=pipcompat.SelectionPreferences(
                 allow_yanked=False,
                 prefer_binary=True,
@@ -74,24 +77,27 @@ class ResolverFactory(object):
 
     def _make_pip_resolver(self, finder, preparer):
         return pipcompat.Resolver(
-            finder=finder,
             preparer=preparer,
             session=self.pip_session,
-            ignore_installed=True,
-            wheel_cache=None,
+            finder=finder,
+            make_install_req = functools.partial(
+                pipcompat.install_req_from_req_string,
+                isolated=True,
+                wheel_cache=None,
+                use_pep517=None,
+            ),
             use_user_site=False,
             ignore_dependencies=False,
+            ignore_installed=True,
             ignore_requires_python=True,
             force_reinstall=False,
-            isolated=True,
             upgrade_strategy="to-satisfy-only",
         )
 
-    def _make_wheel_builder(self, finder, preparer):
+    def _make_wheel_builder(self, preparer):
         return pipcompat.WheelBuilder(
-            finder,
-            preparer,
-            None,
+            preparer=preparer,
+            wheel_cache=pipcompat.WheelCache(None, None),
             build_options=[],
             global_options=[],
             no_clean=True,
@@ -153,10 +159,7 @@ class Resolver(object):
         ]
 
     def _build_wheels_if_necessary(self, requirements):
-        build_failures = self._wheel_builder.build(
-            requirements,
-            session=self._session,
-        )
+        build_failures = self._wheel_builder.build(requirements)
         if build_failures:
             raise WheelBuildError(build_failures)
 
@@ -207,10 +210,9 @@ class Resolver(object):
         # unpacked wheel that looks like an installed distribution
         requirement.ensure_has_source_dir(self._work_dirs.build)
         pipcompat.unpack_url(
-            requirement.link,
-            requirement.source_dir,
-            None,
-            False,
+            link=requirement.link,
+            location=requirement.source_dir,
+            download_dir=None,
             session=self._session,
         )
 

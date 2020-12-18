@@ -4,8 +4,8 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 def pip_rules_dependencies():
     _remote_wheel(
         name = "pip",
-        url = "https://files.pythonhosted.org/packages/30/db/9e38760b32e3e7f40cce46dd5fb107b8c73840df38f0046d8e6514e675a1/pip-19.2.3-py2.py3-none-any.whl",
-        sha256 = "340a0ba40fdeb16413914c0fcd8e0b4ebb0bf39a900ec80e11c05d836c05103f",
+        url = "https://files.pythonhosted.org/packages/00/b6/9cfa56b4081ad13874b0c6f96af8ce16cfbc1cb06bedf8e9164ce5551ec1/pip-19.3.1-py2.py3-none-any.whl",
+        sha256 = "6917c65fc3769ecdc61405d3dfd97afdedd75808d200b2838d7d961cebc0c2c7",
     )
 
     _remote_wheel(
