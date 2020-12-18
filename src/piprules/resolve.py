@@ -49,11 +49,16 @@ class ResolverFactory(object):
                 )
 
     def _make_finder(self):
-        return pipcompat.PackageFinder(
-            find_links=[],
-            index_urls=self.index_urls,
+        return pipcompat.PackageFinder.create(
+            search_scope=pipcompat.SearchScope.create(
+                find_links=[],
+                index_urls=self.index_urls,
+            ),
             session=self.pip_session,
-            prefer_binary=True,
+            selection_prefs=pipcompat.SelectionPreferences(
+                allow_yanked=False,
+                prefer_binary=True,
+            ),
         )
 
     def _make_preparer(self, requirement_tracker, work_dirs):
@@ -158,8 +163,8 @@ class Resolver(object):
     def _create_resolved_requirement(self, requirement):
         LOG.debug("Creating resolved requirement for %s", requirement.name)
 
-        abstract_dist = pipcompat.make_abstract_dist(requirement)
-        dist = abstract_dist.dist()
+        abstract_dist = pipcompat.make_distribution_for_install_requirement(requirement)
+        dist = abstract_dist.get_pkg_resources_distribution()
 
         dependencies = [
             pipcompat.canonicalize_name(dep.name)
@@ -198,7 +203,7 @@ class Resolver(object):
         LOG.debug("Setting source of %s to %s", requirement.name, url)
         requirement.link = pipcompat.Link(url, comes_from=wheel_path)
 
-        # This is necessary for the make_abstract_dist step, which relies on an
+        # This is necessary for the make_distribution_for_install_requirement step, which relies on an
         # unpacked wheel that looks like an installed distribution
         requirement.ensure_has_source_dir(self._work_dirs.build)
         pipcompat.unpack_url(
