@@ -21,8 +21,9 @@ def resolve_requirement_set(requirement_set, pip_session, index_urls, wheel_dir)
 
     resolver_factory = ResolverFactory(pip_session, index_urls, wheel_dir)
 
-    with resolver_factory.make_resolver() as resolver:
-        return resolver.resolve(requirement_set)
+    with pipcompat.global_tempdir_manager():
+        with resolver_factory.make_resolver() as resolver:
+            return resolver.resolve(requirement_set)
 
 
 class ResolverFactory(object):
@@ -34,17 +35,15 @@ class ResolverFactory(object):
 
     @contextlib.contextmanager
     def make_resolver(self):
-        with pipcompat.RequirementTracker() as requirement_tracker:
+        with pipcompat.get_requirement_tracker() as requirement_tracker:
             with _WorkDirs(tempfile.mkdtemp()) as work_dirs:
                 finder = self._make_finder()
-                preparer = self._make_preparer(requirement_tracker, work_dirs)
+                preparer = self._make_preparer(requirement_tracker, work_dirs, finder)
                 pip_resolver = self._make_pip_resolver(finder, preparer)
-                wheel_builder = self._make_wheel_builder(preparer)
 
                 yield Resolver(
                     self.pip_session,
                     pip_resolver,
-                    wheel_builder,
                     work_dirs,
                     self.wheel_dir,
                 )
@@ -64,21 +63,26 @@ class ResolverFactory(object):
             ),
         )
 
-    def _make_preparer(self, requirement_tracker, work_dirs):
+    def _make_preparer(self, requirement_tracker, work_dirs, finder):
         return pipcompat.RequirementPreparer(
             build_dir=work_dirs.build,
-            src_dir=work_dirs.src,
             download_dir=None,
+            src_dir=work_dirs.src,
             wheel_download_dir=work_dirs.wheel,
-            req_tracker=requirement_tracker,
-            progress_bar="off",
             build_isolation=True,
+            req_tracker=requirement_tracker,
+            downloader=pipcompat.Downloader(
+                self.pip_session,
+                progress_bar="off",
+            ),
+            finder=finder,
+            require_hashes=False,
+            use_user_site=False,
         )
 
     def _make_pip_resolver(self, finder, preparer):
         return pipcompat.Resolver(
             preparer=preparer,
-            session=self.pip_session,
             finder=finder,
             make_install_req = functools.partial(
                 pipcompat.install_req_from_req_string,
@@ -92,15 +96,6 @@ class ResolverFactory(object):
             ignore_requires_python=True,
             force_reinstall=False,
             upgrade_strategy="to-satisfy-only",
-        )
-
-    def _make_wheel_builder(self, preparer):
-        return pipcompat.WheelBuilder(
-            preparer=preparer,
-            wheel_cache=pipcompat.WheelCache(None, None),
-            build_options=[],
-            global_options=[],
-            no_clean=True,
         )
 
 
@@ -139,10 +134,9 @@ class _WorkDirs(object):
 
 class Resolver(object):
 
-    def __init__(self, session, pip_resolver, wheel_builder, work_dirs, wheel_dir):
+    def __init__(self, session, pip_resolver, work_dirs, wheel_dir):
         self._session = session
         self._pip_resolver = pip_resolver
-        self._wheel_builder = wheel_builder
         self._work_dirs = work_dirs
         self._wheel_dir = wheel_dir
 
@@ -151,19 +145,29 @@ class Resolver(object):
 
         requirements = requirement_set.requirements.values()
 
-        self._build_wheels_if_necessary(requirements)
+        built_wheels = self._build_wheels_if_necessary(requirements)
 
         return [
-            self._create_resolved_requirement(requirement)
-            for requirement in requirements
+            self._create_resolved_requirement(requirement, False)
+            for requirement in requirements if requirements not in built_wheels
+        ] + [
+            self._create_resolved_requirement(requirement, True)
+            for requirement in built_wheels
         ]
 
     def _build_wheels_if_necessary(self, requirements):
-        build_failures = self._wheel_builder.build(requirements)
+        build_successes, build_failures = pipcompat.build(
+            requirements=[req for req in requirements if pipcompat.should_build_for_wheel_command(req)],
+            wheel_cache=pipcompat.WheelCache(None, None),
+            build_options=[],
+            global_options=[],
+        )
         if build_failures:
             raise WheelBuildError(build_failures)
+        return build_successes
 
-    def _create_resolved_requirement(self, requirement):
+
+    def _create_resolved_requirement(self, requirement, use_local_wheel_source):
         LOG.debug("Creating resolved requirement for %s", requirement.name)
 
         abstract_dist = pipcompat.make_distribution_for_install_requirement(requirement)
@@ -174,8 +178,6 @@ class Resolver(object):
             for dep in dist.requires(requirement.extras)
         ]
         version = dist.version
-
-        use_local_wheel_source = not requirement.link.is_wheel
 
         if use_local_wheel_source:
             self._set_link_to_local_wheel(requirement)
@@ -199,7 +201,7 @@ class Resolver(object):
         )
 
     def _set_link_to_local_wheel(self, requirement):
-        temp_wheel_path = _find_wheel(self._work_dirs.wheel, requirement.name)
+        temp_wheel_path = requirement.local_file_path
         wheel_path = _copy_file_if_missing(temp_wheel_path, self._wheel_dir)
         url = pipcompat.path_to_url(wheel_path)
 
@@ -209,17 +211,14 @@ class Resolver(object):
         # This is necessary for the make_distribution_for_install_requirement step, which relies on an
         # unpacked wheel that looks like an installed distribution
         requirement.ensure_has_source_dir(self._work_dirs.build)
-        pipcompat.unpack_url(
+        pipcompat.unpack_file_url(
             link=requirement.link,
             location=requirement.source_dir,
-            download_dir=None,
-            session=self._session,
         )
 
     def _compute_sha256_sum(self, requirement):
         LOG.debug("Computing sha256 sum for %s", requirement.name)
-        temp_wheel_path = _find_wheel(self._work_dirs.wheel, requirement.name)
-        return util.compute_file_hash(temp_wheel_path)
+        return util.compute_file_hash(requirement.local_file_path)
 
 
 class WheelBuildError(Error):
@@ -229,33 +228,6 @@ class WheelBuildError(Error):
     def __init__(self, failures):
         super(WheelBuildError, self).__init__(self.__doc__)
         self.failures = failures
-
-
-def _find_wheel(directory, name):
-    canon_name = pipcompat.canonicalize_name(name)
-    for filename in os.listdir(directory):
-        path = os.path.join(directory, filename)
-        if os.path.isfile(path):
-            try:
-                wheel = pipcompat.Wheel(filename)
-            except pipcompat.InvalidWheelFilename:
-                continue
-            if pipcompat.canonicalize_name(wheel.name) == canon_name:
-                return path
-
-    raise WheelFindError(name)
-
-
-class WheelFindError(Error):
-
-    """Failed to find a wheel file"""
-
-    def __init__(self, name):
-        super(WheelFindError, self).__init__()
-        self.name = name
-
-    def __str__(self):
-        return 'Could not find wheel matching name "{}"'.format(self.name)
 
 
 def _copy_file_if_missing(source_path, directory):
