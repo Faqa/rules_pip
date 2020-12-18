@@ -1,10 +1,7 @@
 import errno
-import contextlib
+import hashlib
+import itertools
 import os
-
-
-def normalize_distribution_name(name):
-    return name.lower().replace("-", "_")
 
 
 def get_path_stem(path):
@@ -19,20 +16,19 @@ def ensure_directory_exists(path):
             raise err
 
 
-def get_import_path_of_module(module):
-    return os.path.abspath(os.path.dirname(os.path.dirname(module.__file__)))
+def full_groupby(iterable, key=None):
+    """Like itertools.groupby(), but sorts the input on the group key first."""
+    return itertools.groupby(sorted(iterable, key=key), key=key)
 
 
-@contextlib.contextmanager
-def prepend_to_pythonpath(paths):
-    original_pythonpath = os.environ.get("PYTHONPATH")
-    original_parts = original_pythonpath.split(":") if original_pythonpath else []
-    os.environ["PYTHONPATH"] = ":".join(paths + original_parts)
+def compute_file_hash(path, algorithm="sha256"):
+    hasher = hashlib.new(algorithm)
+    block_size = 4096
 
-    try:
-        yield
-    finally:
-        if original_pythonpath is None:
-            del os.environ["PYTHONPATH"]
-        else:
-            os.environ["PYTHONPATH"] = original_pythonpath
+    with open(path, mode='rb') as file_:
+        buf = file_.read(block_size)
+        while buf:
+            hasher.update(buf)
+            buf = file_.read(block_size)
+
+    return hasher.hexdigest()
