@@ -26,7 +26,7 @@ def main():
 
     lock_file = lockfile.load(lock_file_path or '')
 
-    requirement_set = requirements.collect_and_condense(
+    requirement_list = requirements.collect_and_condense(
         pip_session,
         lock_file,
         args.requirements_files,
@@ -35,7 +35,7 @@ def main():
     )
 
     resolved_requirements = resolve.resolve_requirement_set(
-        requirement_set,
+        requirement_list,
         pip_session,
         index_urls,
         wheel_directory,

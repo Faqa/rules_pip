@@ -72,24 +72,16 @@ class Collection(object):
     def add_from_requirements_file(self, path, pip_session):
         LOG.debug("Adding requirements from file %s to collection", path)
 
-        for requirement in pipcompat.parse_requirements(path, session=pip_session):
+        for parsed_requirement in pipcompat.parse_requirements(path, session=pip_session):
+            requirement = pipcompat.install_req_from_parsed_requirement(parsed_requirement)
             LOG.debug("Adding direct requirement %s", requirement)
             requirement.is_direct = True
+            requirement.rules_pip_is_direct = True
             self.add(requirement)
 
     def condense(self):
         LOG.debug("Condensing requirement collection into a set")
-
-        condensed_set = pipcompat.RequirementSet()
-
-        for requirement in self._generate_condensed_requirements():
-            condensed_set.add_requirement(
-                requirement,
-                # This is required for indirect requirements, but isn't really used
-                parent_req_name=(None if requirement.is_direct else "dummy"),
-            )
-
-        return condensed_set
+        return [requirement for requirement in self._generate_condensed_requirements()]
 
     def _generate_condensed_requirements(self):
         for name, group in self._iterate_grouped_requirements():
@@ -120,7 +112,8 @@ def _create_locked_requirement(name, extras, version, is_direct):
         constraint,
         comes_from="lock file",
     )
-    requirement.is_direct = is_direct
+    requirement.is_direct = True
+    requirement.rules_pip_is_direct = is_direct
     return requirement
 
 
