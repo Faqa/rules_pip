@@ -9,7 +9,6 @@ from pip._internal.models.link import Link
 from pip._internal.models.search_scope import SearchScope
 from pip._internal.models.selection_prefs import SelectionPreferences
 from pip._internal.operations.prepare import make_distribution_for_install_requirement, RequirementPreparer
-from pip._internal.network.download import Downloader
 from pip._internal.req import parse_requirements, InstallRequirement
 from pip._internal.req.constructors import install_req_from_req_string, install_req_from_parsed_requirement
 from pip._internal.req.req_tracker import get_requirement_tracker

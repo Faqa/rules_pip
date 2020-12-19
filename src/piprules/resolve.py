@@ -66,18 +66,16 @@ class ResolverFactory(object):
     def _make_preparer(self, requirement_tracker, work_dirs, finder):
         return pipcompat.RequirementPreparer(
             build_dir=work_dirs.build,
-            download_dir=None,
+            download_dir=work_dirs.wheel,
             src_dir=work_dirs.src,
-            wheel_download_dir=work_dirs.wheel,
             build_isolation=True,
             req_tracker=requirement_tracker,
-            downloader=pipcompat.Downloader(
-                self.pip_session,
-                progress_bar="off",
-            ),
+            session=self.pip_session,
+            progress_bar="off",
             finder=finder,
             require_hashes=False,
             use_user_site=False,
+            lazy_wheel=False,
         )
 
     def _make_pip_resolver(self, finder, preparer):
