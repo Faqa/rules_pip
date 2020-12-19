@@ -16,14 +16,14 @@ class Error(Exception):
     """Base exception for the resolve module"""
 
 
-def resolve_requirement_set(requirement_set, pip_session, index_urls, wheel_dir):
+def resolve_requirement_set(requirement_list, pip_session, index_urls, wheel_dir):
     LOG.info("Resolving dependencies and building wheels")
 
     resolver_factory = ResolverFactory(pip_session, index_urls, wheel_dir)
 
     with pipcompat.global_tempdir_manager():
         with resolver_factory.make_resolver() as resolver:
-            return resolver.resolve(requirement_set)
+            return resolver.resolve(requirement_list)
 
 
 class ResolverFactory(object):
@@ -84,11 +84,10 @@ class ResolverFactory(object):
         return pipcompat.Resolver(
             preparer=preparer,
             finder=finder,
+            wheel_cache=None,
             make_install_req = functools.partial(
                 pipcompat.install_req_from_req_string,
                 isolated=True,
-                wheel_cache=None,
-                use_pep517=None,
             ),
             use_user_site=False,
             ignore_dependencies=False,
@@ -140,8 +139,11 @@ class Resolver(object):
         self._work_dirs = work_dirs
         self._wheel_dir = wheel_dir
 
-    def resolve(self, requirement_set):
-        self._pip_resolver.resolve(requirement_set)
+    def resolve(self, requirement_list):
+        requirement_set = self._pip_resolver.resolve(
+            requirement_list,
+            check_supported_wheels=True,
+        )
 
         requirements = requirement_set.requirements.values()
 
@@ -195,7 +197,7 @@ class Resolver(object):
             pipcompat.canonicalize_name(requirement.name),
             version,
             source,
-            is_direct=requirement.is_direct,
+            is_direct=requirement.rules_pip_is_direct,
             dependencies=dependencies,
             extras=requirement.extras,
         )
@@ -207,14 +209,6 @@ class Resolver(object):
 
         LOG.debug("Setting source of %s to %s", requirement.name, url)
         requirement.link = pipcompat.Link(url, comes_from=wheel_path)
-
-        # This is necessary for the make_distribution_for_install_requirement step, which relies on an
-        # unpacked wheel that looks like an installed distribution
-        requirement.ensure_has_source_dir(self._work_dirs.build)
-        pipcompat.unpack_file_url(
-            link=requirement.link,
-            location=requirement.source_dir,
-        )
 
     def _compute_sha256_sum(self, requirement):
         LOG.debug("Computing sha256 sum for %s", requirement.name)
