@@ -191,11 +191,15 @@ class Resolver(object):
             else self._compute_sha256_sum(requirement)
         )
 
+        is_direct = False
+        if hasattr(requirement, "rules_pip_is_direct"):
+            is_direct = requirement.rules_pip_is_direct
+
         return ResolvedRequirement(
             pipcompat.canonicalize_name(requirement.name),
             version,
             source,
-            is_direct=requirement.rules_pip_is_direct,
+            is_direct=is_direct,
             dependencies=dependencies,
             extras=requirement.extras,
         )
