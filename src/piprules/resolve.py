@@ -137,23 +137,28 @@ class Resolver(object):
         self._work_dirs = work_dirs
         self._wheel_dir = wheel_dir
 
-    def resolve(self, requirement_list):
+    def resolve(self, requirement_map):
         requirement_set = self._pip_resolver.resolve(
-            requirement_list,
+            list(requirement_map.values()),
             check_supported_wheels=True,
         )
 
         requirements = requirement_set.requirements.values()
 
         built_wheels = self._build_wheels_if_necessary(requirements)
+        res_list = []
 
-        return [
-            self._create_resolved_requirement(requirement, False)
-            for requirement in requirements if requirements not in built_wheels
-        ] + [
-            self._create_resolved_requirement(requirement, True)
-            for requirement in built_wheels
-        ]
+        for requirement in requirements:
+            is_direct = False
+            if requirement.name in requirement_map and hasattr(requirement_map[requirement.name], "rules_pip_is_direct"):
+                is_direct = requirement_map[requirement.name].rules_pip_is_direct
+
+            use_local_wheels = requirement in built_wheels
+            res_list.append(self._create_resolved_requirement(requirement, use_local_wheels, is_direct))
+
+        return res_list
+
+
 
     def _build_wheels_if_necessary(self, requirements):
         build_successes, build_failures = pipcompat.build(
@@ -167,7 +172,7 @@ class Resolver(object):
         return build_successes
 
 
-    def _create_resolved_requirement(self, requirement, use_local_wheel_source):
+    def _create_resolved_requirement(self, requirement, use_local_wheel_source, is_direct):
         LOG.debug("Creating resolved requirement for %s", requirement.name)
 
         abstract_dist = pipcompat.make_distribution_for_install_requirement(requirement)
@@ -190,10 +195,6 @@ class Resolver(object):
             if link.hash and link.hash_name == "sha256"
             else self._compute_sha256_sum(requirement)
         )
-
-        is_direct = False
-        if hasattr(requirement, "rules_pip_is_direct"):
-            is_direct = requirement.rules_pip_is_direct
 
         return ResolvedRequirement(
             pipcompat.canonicalize_name(requirement.name),

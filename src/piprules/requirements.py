@@ -81,7 +81,7 @@ class Collection(object):
 
     def condense(self):
         LOG.debug("Condensing requirement collection into a set")
-        return [requirement for requirement in self._generate_condensed_requirements()]
+        return {requirement.name: requirement for requirement in self._generate_condensed_requirements()}
 
     def _generate_condensed_requirements(self):
         for name, group in self._iterate_grouped_requirements():
